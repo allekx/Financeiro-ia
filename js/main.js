@@ -16,25 +16,30 @@ function adicionarTransacao(event) {
     const descricao = descricaoInput.value.trim();
     const valor = parseFloat(valorInput.value);
     const tipo = tipoInput.value;
+    const categoria = document.getElementById("categoria").value;
 
     if (descricao === "" || isNaN(valor) || valor <= 0) {
         alert("Por favor, preencha os campos corretamente.");
         return;
     }
 
-    const transacao = { descricao, valor, tipo };
+    const transacao = { descricao, valor, tipo, categoria };
     transacoes.push(transacao);
 
     atualizarLista();
     atualizarSaldo();
+    atualizarMeta();
+    atualizarGrafico();
     salvarNoLocalStorage();
 
     form.reset();
 }
 
+
 // Função para atualizar a lista de transações na tela
 function atualizarLista() {
     listaTransacoes.innerHTML = "";
+    
     transacoes.forEach((transacao, index) => {
         const linha = document.createElement("tr");
 
@@ -42,12 +47,14 @@ function atualizarLista() {
             <td>${transacao.descricao}</td>
             <td>R$ ${transacao.valor.toFixed(2)}</td>
             <td class="${transacao.tipo}">${transacao.tipo === "entrada" ? "Entrada" : "Saída"}</td>
+            <td>${transacao.categoria}</td>
             <td><button onclick="removerTransacao(${index})">X</button></td>
         `;
 
         listaTransacoes.appendChild(linha);
     });
 }
+
 
 // Função para atualizar o saldo
 function atualizarSaldo() {
@@ -155,3 +162,133 @@ function removerTransacao(index) {
 // Atualiza o gráfico ao carregar as transações salvas
 carregarDoLocalStorage();
 atualizarGrafico();
+
+
+
+
+// Selecionando os elementos dos filtros
+const filtroTipo = document.getElementById("filtro-tipo");
+const filtroDataInicial = document.getElementById("filtro-data-inicial");
+const filtroDataFinal = document.getElementById("filtro-data-final");
+const btnFiltrar = document.getElementById("btn-filtrar");
+
+// Função para atualizar a lista de transações com filtros
+function atualizarListaFiltrada() {
+    let transacoesFiltradas = transacoes;
+
+    // Filtro por tipo (entrada/saída)
+    if (filtroTipo.value !== "todos") {
+        transacoesFiltradas = transacoesFiltradas.filter(t => t.tipo === filtroTipo.value);
+    }
+
+    // Filtro por data
+    const dataInicial = filtroDataInicial.value ? new Date(filtroDataInicial.value) : null;
+    const dataFinal = filtroDataFinal.value ? new Date(filtroDataFinal.value) : null;
+
+    transacoesFiltradas = transacoesFiltradas.filter(t => {
+        const dataTransacao = new Date(t.data || "2024-01-01"); // Se não tiver data, usa uma padrão
+        return (!dataInicial || dataTransacao >= dataInicial) && (!dataFinal || dataTransacao <= dataFinal);
+    });
+
+    // Atualiza a exibição das transações filtradas
+    listaTransacoes.innerHTML = "";
+    transacoesFiltradas.forEach((transacao, index) => {
+        const linha = document.createElement("tr");
+
+        linha.innerHTML = `
+            <td>${transacao.descricao}</td>
+            <td>R$ ${transacao.valor.toFixed(2)}</td>
+            <td class="${transacao.tipo}">${transacao.tipo === "entrada" ? "Entrada" : "Saída"}</td>
+            <td><button onclick="removerTransacao(${index})">X</button></td>
+        `;
+
+        listaTransacoes.appendChild(linha);
+    });
+}
+
+
+
+
+// Evento de clique para aplicar o filtro
+btnFiltrar.addEventListener("click", atualizarListaFiltrada);
+
+
+
+
+
+// Selecionando os elementos da meta
+const inputMeta = document.getElementById("valor-meta");
+const btnDefinirMeta = document.getElementById("btn-definir-meta");
+const progressoMeta = document.getElementById("progresso-meta");
+const metaTotal = document.getElementById("meta-total");
+const barraProgresso = document.getElementById("barra-progresso");
+
+// Carregar meta salva no LocalStorage
+let metaEconomia = localStorage.getItem("metaEconomia") ? parseFloat(localStorage.getItem("metaEconomia")) : 0;
+metaTotal.textContent = metaEconomia.toFixed(2);
+
+// Função para atualizar o progresso da meta
+function atualizarMeta() {
+    let totalEntradas = transacoes
+        .filter(t => t.tipo === "entrada")
+        .reduce((acc, t) => acc + t.valor, 0);
+
+    progressoMeta.textContent = totalEntradas.toFixed(2);
+
+    let progresso = metaEconomia > 0 ? (totalEntradas / metaEconomia) * 100 : 0;
+    progresso = progresso > 100 ? 100 : progresso; // Limita o progresso a 100%
+    
+    barraProgresso.style.width = `${progresso}%`;
+}
+
+// Função para definir uma nova meta
+btnDefinirMeta.addEventListener("click", () => {
+    const novaMeta = parseFloat(inputMeta.value);
+    if (isNaN(novaMeta) || novaMeta <= 0) {
+        alert("Por favor, insira um valor válido para a meta.");
+        return;
+    }
+
+    metaEconomia = novaMeta;
+    localStorage.setItem("metaEconomia", metaEconomia);
+    metaTotal.textContent = metaEconomia.toFixed(2);
+    atualizarMeta();
+});
+
+// Atualizar a meta sempre que os dados mudam
+function adicionarTransacao(event) {
+    event.preventDefault();
+
+    const descricao = descricaoInput.value.trim();
+    const valor = parseFloat(valorInput.value);
+    const tipo = tipoInput.value;
+
+    if (descricao === "" || isNaN(valor) || valor <= 0) {
+        alert("Por favor, preencha os campos corretamente.");
+        return;
+    }
+
+    const transacao = { descricao, valor, tipo };
+    transacoes.push(transacao);
+
+    atualizarLista();
+    atualizarSaldo();
+    atualizarMeta(); // Atualiza o progresso da meta
+    atualizarGrafico();
+    salvarNoLocalStorage();
+
+    form.reset();
+}
+
+function removerTransacao(index) {
+    transacoes.splice(index, 1);
+    atualizarLista();
+    atualizarSaldo();
+    atualizarMeta(); // Atualiza o progresso da meta
+    atualizarGrafico();
+    salvarNoLocalStorage();
+}
+
+// Atualizar a meta ao carregar os dados salvos
+carregarDoLocalStorage();
+atualizarMeta();
